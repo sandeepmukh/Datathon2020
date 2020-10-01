@@ -4,10 +4,6 @@ install.packages("ggplot2")
 library("ggplot2")
 install.packages("ggpubr")
 library("ggpubr")
-install.packages("readxl")
-library("readxl")
-install.packages("ggpubr")
-library("ggpubr")
 library(tidyverse)
 library(broom)
 install.packages("mctest")
@@ -50,21 +46,24 @@ MovieID <- na.omit(MovieID)
 TagtoMedian <- MovieID %>%
   group_by(tagId) %>% 
   summarise(median_net = median(netrevenue))
-
 ggplot(TagtoMedian, aes(tagId, median_net)) +
-     geom_point(shape = 16, size = 5, show.legend = FALSE) +
-     theme_minimal() +
-     scale_color_gradient(low = "#32aeff", high = "#f2aeff") +
-     scale_alpha(range = c(.25, .6)) + 
-     labs(x= "Tag ID", y = "Median Net Revenue (USD)", title = "Tags with Highest Median Net Revenue") 
+  geom_point(shape = 16, size = 5, show.legend = FALSE) +
+  theme_minimal() +
+  scale_color_gradient(low = "#32aeff", high = "#f2aeff") +
+  scale_alpha(range = c(.25, .6)) + 
+  labs(x= "Tag ID", y = "Median Net Revenue (USD)", title = "Tags with Highest Median Net Revenue") 
 #Finding max value tags
 maxValInds <- which(TagtoMedian$median_net > 1.5e8)
 #Highest grossing tags
 genome_tags[maxValInds, ]
+
+
+#Oscars Tag analysis
+TagToOscars <- MovieID %>%
+  group_by(tagId) %>% 
+  summarise(oscarChance = mean(OscarNom))
+relevantOscar <- TagToOscars[which(TagToOscars$oscarChance < 1),]
+maxValIndOscar <- which(relevantOscar$oscarChance > .8)
+genome_tags[maxValIndOscar, ]
+
 write.csv(MovieID, "C:\\Users\\smuke\\OneDrive\\Desktop\\Datathon2020\\MoviesWithGenomeTags.csv")
-#Try k-means (didn't work)
-set.seed(123)
-fviz_nbclust(movieDf, kmeans, method = "silhouette")
-fviz_nbclust(numericMoveDF, kmeans, method = "silhouette")
-km.res <- kmeans(movieDf, 2, nstart = 25)
-dd <- cbind(numericMoveDF, cluster = km.res$cluster)
