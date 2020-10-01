@@ -61,7 +61,7 @@ ggplot(TagtoMedian, aes(tagId, median_net)) +
 maxValInds <- which(TagtoMedian$median_net > 1.5e8)
 #Highest grossing tags
 genome_tags[maxValInds, ]
-
+write.csv(MovieID, "C:\\Users\\smuke\\OneDrive\\Desktop\\Datathon2020\\MoviesWithGenomeTags.csv")
 #Try k-means (didn't work)
 set.seed(123)
 fviz_nbclust(movieDf, kmeans, method = "silhouette")
