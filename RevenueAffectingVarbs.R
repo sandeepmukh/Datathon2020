@@ -44,7 +44,23 @@ MovieID <- rename(MovieID, c("name"="title"))
 MovieID$gross <- movieDf$gross[match(MovieID$name, movieDf$name)]
 MovieID$budget <- movieDf$budget[match(MovieID$name, movieDf$name)]
 MovieID$netrevenue <- MovieID$gross - MovieID$budget
+#Remove null values
+MovieID <- na.omit(MovieID)
+#Get median net revenue by take
+TagtoMedian <- MovieID %>%
+  group_by(tagId) %>% 
+  summarise(median_net = median(netrevenue))
 
+ggplot(TagtoMedian, aes(tagId, median_net)) +
+     geom_point(shape = 16, size = 5, show.legend = FALSE) +
+     theme_minimal() +
+     scale_color_gradient(low = "#32aeff", high = "#f2aeff") +
+     scale_alpha(range = c(.25, .6)) + 
+     labs(x= "Tag ID", y = "Median Net Revenue (USD)", title = "Tags with Highest Median Net Revenue") 
+#Finding max value tags
+maxValInds <- which(TagtoMedian$median_net > 1.5e8)
+#Highest grossing tags
+genome_tags[maxValInds, ]
 
 #Try k-means (didn't work)
 set.seed(123)
