@@ -40,6 +40,11 @@ MovieID <- subset(MovieID, select = -c(genres))
 MovieID <- MovieID %>% filter(MovieID$relevance > .9)  
 MovieID <- transform(MovieID, title = substr(MovieID$title, 1, nchar(as.character(MovieID$title))-7))
 MovieID <- rename(MovieID, c("name"="title"))
+#Adding gross and budget and net revenue
+MovieID$gross <- movieDf$gross[match(MovieID$name, movieDf$name)]
+MovieID$budget <- movieDf$budget[match(MovieID$name, movieDf$name)]
+MovieID$netrevenue <- MovieID$gross - MovieID$budget
+
 
 #Try k-means (didn't work)
 set.seed(123)
