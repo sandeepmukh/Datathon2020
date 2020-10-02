@@ -42,15 +42,14 @@ MovieID$budget <- movieDf$budget[match(MovieID$name, movieDf$name)]
 MovieID$netrevenue <- MovieID$gross - MovieID$budget
 #Remove null values
 MovieID <- na.omit(MovieID)
+MovieID <- which(MovieID$budget != 0)
 #Get median net revenue by take
 TagtoMedian <- MovieID %>%
   group_by(tagId) %>% 
   summarise(median_net = median(netrevenue))
 ggplot(TagtoMedian, aes(tagId, median_net)) +
-  geom_point(shape = 16, size = 5, show.legend = FALSE) +
+  geom_point(shape = 16, size = 1, show.legend = FALSE, color = "blue") +
   theme_minimal() +
-  scale_color_gradient(low = "#32aeff", high = "#f2aeff") +
-  scale_alpha(range = c(.25, .6)) + 
   labs(x= "Tag ID", y = "Median Net Revenue (USD)", title = "Tags with Highest Median Net Revenue") 
 #Finding max value tags
 maxValInds <- which(TagtoMedian$median_net > 1.5e8)
@@ -62,8 +61,14 @@ genome_tags[maxValInds, ]
 TagToOscars <- MovieID %>%
   group_by(tagId) %>% 
   summarise(oscarChance = mean(OscarNom))
-relevantOscar <- TagToOscars[which(TagToOscars$oscarChance < 1),]
+relevantOscar <- TagToOscars[which(sum(MovieID)),]
 maxValIndOscar <- which(relevantOscar$oscarChance > .8)
 genome_tags[maxValIndOscar, ]
+ggplot(relevantOscar, aes(tagId, oscarChance)) +
+  geom_point(shape = 16, size = 1, show.legend = FALSE, color = "blue") +
+  theme_minimal() +
+  labs(x= "Tag ID", y = "Chance of Winning an Oscar", title = "Tags with Highest Chance of Winning Oscars") 
 
 write.csv(MovieID, "C:\\Users\\smuke\\OneDrive\\Desktop\\Datathon2020\\MoviesWithGenomeTags.csv")
+write.csv(TagtoMedian, "C:\\Users\\smuke\\OneDrive\\Desktop\\Datathon2020\\TagToRevenue.csv")
+write.csv(TagToOscars, "C:\\Users\\smuke\\OneDrive\\Desktop\\Datathon2020\\TagToOscar.csv")
