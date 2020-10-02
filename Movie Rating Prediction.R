@@ -1,16 +1,20 @@
 # load libraries
 library(xgboost)
 library(gbm)
+library(leaps)
+library(devtools)
+
 
 # read in data
 movies = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/movies.csv")
 ratings = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/ratings.csv")
 genome_tags = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/genome-tags.csv")
-#tags = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/tags.csv")
+tags = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/tags.csv")
 genome_scores = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/genome-scores.csv")
-#links = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/links.csv")
+links = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/links.csv")
 #the_oscar_award = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/the_oscar_award.csv")
-#movie_industry = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_industry.csv")
+movie_industry = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_industry.csv")
+
 
 # add binary columns for category
 movies$genres = as.character(movies$genres)
@@ -67,6 +71,8 @@ movie_tags = data.frame(movieId = unique(genome_scores$movieId))
 movie_tags[,paste('tag',1:nrow(genome_tags))] = NA
 movie_tags[,2:1129] = matrix(genome_scores$relevance,nrow = 13176, ncol = 1128,byrow = T)
 tags_pca <- prcomp(movie_tags[,2:1129])
+ggbiplot(tags_pca,ellipse=TRUE,obs.scale = 1, var.scale = 1,var.axes=FALSE,   labels=genome_tags$tag)
+
   # with 13 PCs, you can explain 50% of the variance
 summary(tags_pca)$importance[3,1:13]
    # with 344 PCs, you can explain 90% of the variance
@@ -77,62 +83,107 @@ movie_tags[,paste('PCA',1:13)] = tags_pca$x[,1:13]
 # merge "movies3" with the newly created principal components
 movies5 = merge(movies4,movie_tags[,c('movieId',paste('PCA',1:13))])
 
-# run regression
-out = lm(formula = `Mean Rating` ~ Adventure + Animation + Children + Comedy + Fantasy + Romance + Drama + Action + Crime + 
-           Thriller + Horror + Mystery + `Sci-Fi`  + IMAX + Documentary + War + Musical +  Western + `Film-Noir` + `PCA 1` + 
-           `PCA 2` + `PCA 3`+ `PCA 4`+ `PCA 5`+ `PCA 6`+ `PCA 7`+ `PCA 8`+ `PCA 9`+ `PCA 10`+ `PCA 11`+ `PCA 12`+ `PCA 13`+ `Mean Count`, data = movies5)
-summary(out)
 
-plot(movies5$`Mean Rating`,out$fitted.values)
+df = read.csv("/Users/blakesteines/Desktop/Fall\ 2020\ Datathon/movie_lense/data_clean.csv")
 
 
-# XGBoost predictor
-# train with 75% of data, test on remaining 25%
-idx = sample(1:nrow(movies5), round(nrow(movies5)*3/4,0))
-train = movies5[idx,c('Mean Rating','Adventure', 'Animation', 'Children', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Action', 'Crime', 
-                                'Thriller', 'Horror', 'Mystery', 'Sci-Fi', 'IMAX','Documentary','War', 'Musical',  'Western' ,'Film-Noir' ,'PCA 1' , 
-                                'PCA 2' , 'PCA 3', 'PCA 4', 'PCA 5', 'PCA 6', 'PCA 7', 'PCA 8', 'PCA 9', 'PCA 10', 'PCA 11', 'PCA 12', 'PCA 13', 'Mean Count')]
-test = movies5[-idx,c('Mean Rating','Adventure', 'Animation', 'Children', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Action', 'Crime', 
-                            'Thriller', 'Horror', 'Mystery', 'Sci-Fi', 'IMAX','Documentary','War', 'Musical',  'Western' ,'Film-Noir' ,'PCA 1' , 
-                            'PCA 2' , 'PCA 3', 'PCA 4', 'PCA 5', 'PCA 6', 'PCA 7', 'PCA 8', 'PCA 9', 'PCA 10', 'PCA 11', 'PCA 12', 'PCA 13', 'Mean Count')]
-X_train = as.matrix(train[,-1])
-X_test = as.matrix(test[,-1])
-Y_train = as.matrix(train[,1])
-Y_test = as.matrix(test[,1])
+df[,c('Adventure', 'Animation', 'Children', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Action', 'Crime', 
+      'Thriller', 'Horror', 'Mystery', 'Sci.Fi', 'IMAX','War', 'Musical',  'Western' ,'Film.Noir')] = 
+  df[,c('Adventure', 'Animation', 'Children', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Action', 'Crime', 
+         'Thriller', 'Horror', 'Mystery', 'Sci.Fi', 'IMAX','War', 'Musical',  'Western' ,'Film.Noir')]*1
 
-params <- list(booster = "gbtree", objective = "reg:linear", eta = 0.3, gamma = 0,
-               max_depth = 6)
+df$net = df$gross - df$budget
 
-xgb_train <- xgb.DMatrix(data = X_train, label = Y_train)
-xgbcv <- xgb.cv(params = params, data = xgb_train, nfold = 10, nrounds = 10,verbose=F)
-cv_nrounds = which.min(xgbcv$evaluation_log$test_rmse_mean)
-xgb_optb <- xgboost(params = params, data = xgb_train, nround = cv_nrounds,verbose=F)
+#### ANALYSIS BELOW
+# use one of the following y's below
+y = 'Mean.Rating'
+y = 'Var.Rating'
+y = 'net'
 
 
-# group test data in a dense matrix and use the trained model to make out-of-sample predictions
-xgb_test <- xgb.DMatrix(data = X_test, label = Y_test)
-xgb_pred_out_of_sample <- predict(xgb_optb, X_test)
+
+idx = sample(1:nrow(df), round(nrow(df)*3/4,0))
+train = df[idx,c(y,'Adventure', 'Animation', 'Children', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Action', 'Crime', 
+                       'Thriller', 'Horror', 'Mystery', 'Sci.Fi', 'IMAX','War', 'Musical',  'Western' ,'Film.Noir' ,'PCA.1' , 
+                       'PCA.2' , 'PCA.3', 'PCA.4', 'PCA.5', 'PCA.6', 'PCA.7', 'PCA.8', 'PCA.9', 'PCA.10', 'PCA.11', 'PCA.12', 'PCA.13', 'Mean.Count','budget','runtime','year.x','rating')]
+test = df[-idx,c(y,'Adventure', 'Animation', 'Children', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Action', 'Crime', 
+                       'Thriller', 'Horror', 'Mystery', 'Sci.Fi', 'IMAX','War', 'Musical',  'Western' ,'Film.Noir' ,'PCA.1' , 
+                       'PCA.2' , 'PCA.3', 'PCA.4', 'PCA.5', 'PCA.6', 'PCA.7', 'PCA.8', 'PCA.9', 'PCA.10', 'PCA.11', 'PCA.12', 'PCA.13', 'Mean.Count','budget','runtime','year.x','rating')]
+
+train = df[idx,c(y,'Adventure', 'Comedy', 'Drama', 'Action', 
+                   'IMAX','budget','runtime','year.x','rating')]
+test = df[-idx,c(y,'Adventure', 'Comedy', 'Drama', 'Action', 
+                 'IMAX','budget','runtime','year.x','rating')]
 
 
-plot(Y_test, xgb_pred_out_of_sample)
-cor(Y_test, xgb_pred_out_of_sample)
+# best subset selection
+fit_all = regsubsets(sqrt(`Var.Rating`) ~ ., train,nvmax = 30)
+fit_all_sum = summary(fit_all)
+
+# plot results of best subset selection
+# assess models based on RSS, Cp, Adjusted RSq, and BIC
+par(mfrow = c(1, 1))
+
+plot(fit_all_sum$bic, xlab = "Number of Variables", ylab = "BIC", type = 'b', main = "Model Selection using BIC")
+best_bic = which.min(fit_all_sum$bic)
+points(best_bic, fit_all_sum$bic[best_bic], 
+       col = "red", cex = 2, pch = 20)
+
+
+# select the "best" model based on BIC
+best_model = which.min(fit_all_sum$bic)
+predict.regsubsets = function(object, newdata, id, ...) {
+  
+  form  = as.formula(object$call[[2]])
+  mat   = model.matrix(form, newdata)
+  coefs = coef(object, id = id)
+  xvars = names(coefs)
+  
+  mat[, xvars] %*% coefs
+}
+y_pred = predict(fit_all,test,id= best_model)
+y_actual = sqrt(test$`Var.Rating`)
+
+# calculate the MAE and RMSE
+MAE = mean(abs(y_pred-y_actual))
+RMSE = sqrt(mean((y_actual - y_pred) ^ 2))
+
+# plot results
+par(mfrow = c(1,1))
+plot(y_pred,y_actual,
+     xlab = "Predicted Standard Deviation of Movie Rating", ylab = "Actual", 
+     main = "Test Set Prediction of Movielens Rating Std. Dev.",
+     col = "dodgerblue", pch = 20)
+grid()
+abline(0, 1, col = "darkorange", lwd = 2)
+text(x = 0.85, y = 1.3, paste('R-sq = ',round(cor(y_actual,y_pred),3)),cex = 2)
+
+
+#  view coefficients
+View(coef(fit_all,20))
+
 
 # Boosting method 2
-train = as.data.frame(as.matrix(train)*1)
-boost = gbm(`Mean Rating` ~ ., data = train, distribution = "gaussian", 
-                    n.trees = 5000, interaction.depth = 4, shrinkage = 0.01)
-tibble::as_tibble(summary(boost))
+boost = gbm(net ~ ., data = train, distribution = "gaussian", 
+                    n.trees = 500, interaction.depth = 4, shrinkage = 0.01)
+View(tibble::as_tibble(summary(boost)))
+Y_test  = test$net
 boost_tst_pred = predict(boost, newdata = test, n.trees = 5000)
 calc_rmse = function(actual, predicted) {
   sqrt(mean((actual - predicted) ^ 2))
 }
-tst_rmse = calc_rmse(boost_tst_pred, test$`Mean Rating`)
-plot(boost_tst_pred,test$`Mean Rating`,
+tst_mae = mean(abs(boost_tst_pred - Y_test))
+tst_rmse = calc_rmse(boost_tst_pred, Y_test)
+plot(boost_tst_pred,test$net,
      xlab = "Predicted", ylab = "Actual", 
-     main = "Predicted vs Actual: Boosted Model, Test Data",
+     main = "Predicted Net Sales",
      col = "dodgerblue", pch = 20)
 grid()
 abline(0, 1, col = "darkorange", lwd = 2)
-text(x = 2.5, y = 4, paste('R-sq = ',round(cor(boost_tst_pred,Y_test),3)),cex = 2.5)
+text(x = 3e7, y=3e8, paste('R-sq = ',round(cor(boost_tst_pred,Y_test),3)),cex = 2)
+
+
+
+
 
 
