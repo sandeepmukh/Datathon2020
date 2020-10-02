@@ -42,7 +42,6 @@ MovieID$budget <- movieDf$budget[match(MovieID$name, movieDf$name)]
 MovieID$netrevenue <- MovieID$gross - MovieID$budget
 #Remove null values
 MovieID <- na.omit(MovieID)
-MovieID <- which(MovieID$budget != 0)
 #Get median net revenue by take
 TagtoMedian <- MovieID %>%
   group_by(tagId) %>% 
@@ -55,12 +54,12 @@ ggplot(TagtoMedian, aes(tagId, median_net)) +
 maxValInds <- which(TagtoMedian$median_net > 1.5e8)
 #Highest grossing tags
 genome_tags[maxValInds, ]
-
-
+#Add Oscars to MovieID
+MovieID$Oscar <- ifelse(MovieID$name %in% oscarsDF$name, 1, 0)
 #Oscars Tag analysis
 TagToOscars <- MovieID %>%
   group_by(tagId) %>% 
-  summarise(oscarChance = mean(OscarNom))
+  summarise(oscarChance = mean(Oscar))
 relevantOscar <- TagToOscars[which(sum(MovieID)),]
 maxValIndOscar <- which(relevantOscar$oscarChance > .8)
 genome_tags[maxValIndOscar, ]
